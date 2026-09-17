@@ -13,7 +13,7 @@ from .config import (
 )
 from .rendering import (
     grid_to_screen, screen_to_grid, world_to_screen,
-    draw_diamond, draw_wall, draw_hover, draw_player,
+    draw_diamond, draw_wall, draw_hover, draw_red_frame, draw_player,
     apply_fog
 )
 from .game import create_map, create_fow, update_fow, Player
@@ -55,26 +55,31 @@ def main():
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 tgx, tgy = screen_to_grid(mx, my, int(cam_wx), int(cam_wy))
                 if 0 <= tgx < MAP_W and 0 <= tgy < MAP_H:
-                    if WALKABLE.get(game_map[tgy][tgx], False):
-                        # If click on last tile of current path, continue/stop
-                        if len(player.path) > 0 and player.path[-1] == (tgx, tgy):
-                            player.moving = not player.moving
+                    is_walkable = WALKABLE.get(game_map[tgy][tgx], False)
+
+                    if player.moving:
+                        # Stop movement if player is moving
+                        player.stop()
+                    elif is_walkable:
+                        # Walkable tile
+                        if player.target_tile == (tgx, tgy):
+                            # Click on same tile again - start movement
+                            player.start_movement()
                         else:
-                            # Find new path
-                            current_path = find_path(player.gx, player.gy, tgx, tgy, game_map)
-                            if current_path:
-                                player.set_path(current_path)
-                            else:
-                                # No path, stop
-                                player.stop()
+                            # New target - find path
+                            path = find_path(player.gx, player.gy, tgx, tgy, game_map)
+                            player.set_target(tgx, tgy, path)
+                    else:
+                        # Unwalkable tile - set as unreachable target
+                        player.set_target(tgx, tgy, None)
 
         # --- UPDATE ---
         player.update(game_map, MOVE_SPEED)
 
-        # Camera follows player
-        pwx, pwy = player.get_world_pos()
-        cam_wx += (pwx - cam_wx) * 0.1
-        cam_wy += (pwy - cam_wy) * 0.1
+        # Camera centered on player
+        cam_wx, cam_wy = player.get_world_pos()
+        cam_wx = float(cam_wx)
+        cam_wy = float(cam_wy)
 
         # FoW follows player
         update_fow(fow, player.gx, player.gy)
@@ -116,12 +121,22 @@ def main():
                     if is_hover:
                         draw_hover(screen, sx, sy)
 
-        # Draw path preview
-        for px, py in player.get_path():
-            psx, psy = grid_to_screen(px, py, int(cam_wx), int(cam_wy))
-            if -TILE_W*2 < psx < SCREEN_W+TILE_W*2 and \
-               -TILE_H*4 < psy < SCREEN_H+TILE_H*2:
-                draw_hover(screen, psx, psy)
+        # Draw target indication
+        if player.target_tile:
+            target_sx, target_sy = grid_to_screen(player.target_tile[0], player.target_tile[1],
+                                                   int(cam_wx), int(cam_wy))
+            if -TILE_W*2 < target_sx < SCREEN_W+TILE_W*2 and \
+               -TILE_H*4 < target_sy < SCREEN_H+TILE_H*2:
+                if player.target_reachable:
+                    # Draw path with white frames
+                    for px, py in player.path:
+                        psx, psy = grid_to_screen(px, py, int(cam_wx), int(cam_wy))
+                        if -TILE_W*2 < psx < SCREEN_W+TILE_W*2 and \
+                           -TILE_H*4 < psy < SCREEN_H+TILE_H*2:
+                            draw_hover(screen, psx, psy)
+                else:
+                    # Draw red frame for unreachable tile
+                    draw_red_frame(screen, target_sx, target_sy)
 
         # Draw player
         psx, psy = world_to_screen(*player.get_world_pos(), int(cam_wx), int(cam_wy))

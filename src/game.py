@@ -76,6 +76,8 @@ class Player:
         self.path = [(gx, gy)]  # Path to follow
         self.path_index = 0  # Current index in path
         self.moving = False
+        self.target_tile = None  # Currently selected target tile
+        self.target_reachable = False  # Is target reachable
 
     def get_grid_pos(self):
         return self.gx, self.gy
@@ -99,6 +101,31 @@ class Player:
     def stop(self):
         """Stop movement."""
         self.moving = False
+
+    def set_target(self, target_gx, target_gy, path):
+        """Set target tile and path (if reachable)."""
+        self.target_tile = (target_gx, target_gy)
+        if path:
+            self.path = path
+            self.path_index = 0
+            self.target_reachable = True
+        else:
+            self.target_reachable = False
+            # Keep current path when target is unreachable
+
+    def start_movement(self):
+        """Start moving towards target."""
+        if self.target_reachable and self.target_tile:
+            self.path_index = 0
+            self.moving = True
+
+    def clear_target(self):
+        """Clear target and path."""
+        self.target_tile = None
+        self.target_reachable = False
+        self.moving = False
+        self.path = [(self.gx, self.gy)]
+        self.path_index = 0
 
     def update(self, game_map, move_speed):
         """Update smooth movement through path."""
@@ -130,6 +157,3 @@ class Player:
             # Move towards next tile
             self.wx += dx / dist * move_speed
             self.wy += dy / dist * move_speed
-            self.gx, self.gy = screen_to_grid(
-                *world_to_screen(self.wx, self.wy, 0, 0), 0, 0
-            )

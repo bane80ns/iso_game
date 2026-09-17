@@ -106,6 +106,17 @@ def draw_hover(surface, sx, sy):
     pygame.draw.polygon(surface, (255, 255, 200), pts, 2)
 
 
+def draw_red_frame(surface, sx, sy):
+    """Red frame for unreachable/unwalkable tile."""
+    pts = [
+        (sx + TILE_W//2, sy),
+        (sx + TILE_W,    sy + TILE_H//2),
+        (sx + TILE_W//2, sy + TILE_H),
+        (sx,             sy + TILE_H//2),
+    ]
+    pygame.draw.polygon(surface, (255, 0, 0), pts, 3)
+
+
 def draw_player(surface, px, py):
     """Draw player at screen coordinates."""
     cx = px + TILE_W // 2
