@@ -1,5 +1,5 @@
 """
-Rendering i koordinatne transformacije
+Rendering and coordinate transformations
 """
 
 import pygame
@@ -10,44 +10,44 @@ from .config import (
 
 
 # ---------------------------------------------------------------------------
-# KOORDINATNE FUNKCIJE
+# COORDINATE FUNCTIONS
 # ---------------------------------------------------------------------------
 
 def grid_to_world(gx, gy):
-    """Grid -> world (izometrijske) koordinate."""
+    """Grid -> world (isometric) coordinates."""
     wx = (gx - gy) * (TILE_W // 2)
     wy = (gx + gy) * (TILE_H // 2)
     return wx, wy
 
 
 def world_to_screen(wx, wy, cam_wx, cam_wy):
-    """World -> screen koordinate."""
+    """World -> screen coordinates."""
     sx = wx - cam_wx + SCREEN_W // 2
     sy = wy - cam_wy + SCREEN_H // 2
     return sx, sy
 
 
 def grid_to_screen(gx, gy, cam_wx, cam_wy):
-    """Grid -> screen direktno."""
+    """Grid -> screen directly."""
     wx, wy = grid_to_world(gx, gy)
     return world_to_screen(wx, wy, cam_wx, cam_wy)
 
 
 def screen_to_grid(mx, my, cam_wx, cam_wy):
-    """Screen -> grid koordinate (inverzna transformacija)."""
-    wx = mx - SCREEN_W // 2 + cam_wx
-    wy = my - SCREEN_H // 2 + cam_wy
+    """Screen -> grid coordinates (inverse transformation)."""
+    wx = mx - SCREEN_W // 2 - TILE_W // 2 + cam_wx
+    wy = my - SCREEN_H // 2 - TILE_H // 2 + cam_wy
     gx = (wx / (TILE_W // 2) + wy / (TILE_H // 2)) / 2
     gy = (wy / (TILE_H // 2) - wx / (TILE_W // 2)) / 2
     return int(round(gx)), int(round(gy))
 
 
 # ---------------------------------------------------------------------------
-# CRTANJE
+# DRAWING
 # ---------------------------------------------------------------------------
 
 def draw_diamond(surface, color, sx, sy, w=TILE_W, h=TILE_H, border=True):
-    """Crta dijamant (tile)."""
+    """Draw diamond (tile)."""
     pts = [
         (sx + w // 2, sy),
         (sx + w,      sy + h // 2),
@@ -61,7 +61,7 @@ def draw_diamond(surface, color, sx, sy, w=TILE_W, h=TILE_H, border=True):
 
 
 def draw_wall(surface, color, sx, sy):
-    """Crta 3D zid sa senkom."""
+    """Draw 3D wall with shadow."""
     wall_h = TILE_H
     w, h = TILE_W, TILE_H
     top = [
@@ -92,7 +92,7 @@ def draw_wall(surface, color, sx, sy):
 
 
 def draw_hover(surface, sx, sy):
-    """Hover highlight za tile."""
+    """Hover highlight for tile."""
     pts = [
         (sx + TILE_W//2, sy),
         (sx + TILE_W,    sy + TILE_H//2),
@@ -107,23 +107,23 @@ def draw_hover(surface, sx, sy):
 
 
 def draw_player(surface, px, py):
-    """Crta igrača na screen koordinatama."""
+    """Draw player at screen coordinates."""
     cx = px + TILE_W // 2
     cy = py + TILE_H // 2
-    # Senka
+    # Shadow
     pygame.draw.ellipse(surface, (0,0,0), (cx-10, cy-2, 20, 8))
-    # Noge
+    # Legs
     pygame.draw.rect(surface, (40, 40, 120),  (cx-5, cy-12, 4, 10))
     pygame.draw.rect(surface, (40, 40, 120),  (cx+1, cy-12, 4, 10))
-    # Telo
+    # Body
     pygame.draw.rect(surface, (70, 130, 180), (cx-7, cy-26, 14, 14))
-    # Glava
+    # Head
     pygame.draw.circle(surface, (255, 220, 177), (cx, cy-32), 7)
     pygame.draw.circle(surface, (0,0,0),          (cx, cy-32), 7, 1)
 
 
 def apply_fog(color, fog):
-    """Primeni FoW filter na boju."""
+    """Apply FoW filter to color."""
     if fog == UNEXPLORED:
         return None
     if fog == EXPLORED:

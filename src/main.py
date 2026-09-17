@@ -1,5 +1,5 @@
 """
-Iso Game - Glavna petlja
+Iso Game - Main loop
 """
 
 import pygame
@@ -17,6 +17,7 @@ from .rendering import (
     apply_fog
 )
 from .game import create_map, create_fow, update_fow, Player
+from .pathfinding import find_path
 
 
 def main():
@@ -27,17 +28,17 @@ def main():
 
     font = None
 
-    # Inicijalizacija
+    # Initialization
     game_map = create_map()
     fow = create_fow()
-    player = Player(15, 20)
-    
-    # Kamera - world koordinate
+    player = Player(10, 15)
+
+    # Camera - world coordinates
     cam_wx, cam_wy = player.get_world_pos()
     cam_wx, cam_wy = float(cam_wx), float(cam_wy)
-    
+
     update_fow(fow, player.gx, player.gy)
-    
+
     hover_gx, hover_gy = -1, -1
     
     running = True
@@ -55,26 +56,36 @@ def main():
                 tgx, tgy = screen_to_grid(mx, my, int(cam_wx), int(cam_wy))
                 if 0 <= tgx < MAP_W and 0 <= tgy < MAP_H:
                     if WALKABLE.get(game_map[tgy][tgx], False):
-                        player.set_target(tgx, tgy, game_map)
+                        # If click on last tile of current path, continue/stop
+                        if len(player.path) > 0 and player.path[-1] == (tgx, tgy):
+                            player.moving = not player.moving
+                        else:
+                            # Find new path
+                            current_path = find_path(player.gx, player.gy, tgx, tgy, game_map)
+                            if current_path:
+                                player.set_path(current_path)
+                            else:
+                                # No path, stop
+                                player.stop()
 
         # --- UPDATE ---
         player.update(game_map, MOVE_SPEED)
-        
-        # Kamera prati igrača
+
+        # Camera follows player
         pwx, pwy = player.get_world_pos()
         cam_wx += (pwx - cam_wx) * 0.1
         cam_wy += (pwy - cam_wy) * 0.1
-        
-        # FoW prati igrača
+
+        # FoW follows player
         update_fow(fow, player.gx, player.gy)
-        
+
         # Hover
         hover_gx, hover_gy = screen_to_grid(mx, my, int(cam_wx), int(cam_wy))
 
         # --- DRAW ---
         screen.fill((10, 10, 20))
 
-        # Crtaj mapa
+        # Draw map
         for y in range(MAP_H):
             for x in range(MAP_W):
                 fog = fow[y][x]
@@ -105,7 +116,14 @@ def main():
                     if is_hover:
                         draw_hover(screen, sx, sy)
 
-        # Crtaj igrača
+        # Draw path preview
+        for px, py in player.get_path():
+            psx, psy = grid_to_screen(px, py, int(cam_wx), int(cam_wy))
+            if -TILE_W*2 < psx < SCREEN_W+TILE_W*2 and \
+               -TILE_H*4 < psy < SCREEN_H+TILE_H*2:
+                draw_hover(screen, psx, psy)
+
+        # Draw player
         psx, psy = world_to_screen(*player.get_world_pos(), int(cam_wx), int(cam_wy))
         draw_player(screen, psx, psy)
 

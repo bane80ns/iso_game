@@ -1,5 +1,5 @@
 """
-Igra logika - mapa, FoW, stanje igrača
+Game logic - map, FoW, player state
 """
 
 import math
@@ -10,28 +10,28 @@ from .config import (
 
 
 # ---------------------------------------------------------------------------
-# MAPA
+# MAP
 # ---------------------------------------------------------------------------
 
 def create_map():
-    """Generiši mapu."""
+    """Generate map."""
     m = []
     for y in range(MAP_H):
         row = []
         for x in range(MAP_W):
             if x == 0 or y == 0 or x == MAP_W-1 or y == MAP_H-1:
-                row.append(3)  # Zid
+                row.append(3)  # Wall
             elif 12 <= x <= 17 and 12 <= y <= 17:
-                row.append(2)  # Voda
+                row.append(2)  # Water
             elif 3 <= x <= 8 and 3 <= y <= 8:
-                row.append(4)  # Šuma
+                row.append(4)  # Forest
             elif x == y or x == y+1:
-                row.append(1)  # Zemlja
+                row.append(1)  # Dirt
             elif (x in (20,25) and 5 <= y <= 9) or \
                  (20 <= x <= 25 and y in (5,9)):
-                row.append(3)  # Zid
+                row.append(3)  # Wall
             else:
-                row.append(0)  # Trava
+                row.append(0)  # Grass
         m.append(row)
     return m
 
@@ -41,72 +41,95 @@ def create_map():
 # ---------------------------------------------------------------------------
 
 def create_fow():
-    """Kreiraj FoW matricu."""
+    """Create FoW matrix."""
     return [[UNEXPLORED]*MAP_W for _ in range(MAP_H)]
 
 
-def update_fow(fow, pgx, pgy):
-    """Ažuriraj FoW na osnovu pozicije igrača."""
-    # Explored ostaju explored
+def update_fow(fow, player_gx, player_gy):
+    """Update FoW based on player position."""
+    # Explored tiles remain explored
     for y in range(MAP_H):
         for x in range(MAP_W):
             if fow[y][x] == VISIBLE:
                 fow[y][x] = EXPLORED
-    
-    # Ažuriraj vidljive tile-ove
+
+    # Update visible tiles
     for y in range(MAP_H):
         for x in range(MAP_W):
-            if math.sqrt((x-pgx)**2 + (y-pgy)**2) <= VISION_RADIUS:
+            if math.sqrt((x-player_gx)**2 + (y-player_gy)**2) <= VISION_RADIUS:
                 fow[y][x] = VISIBLE
 
 
 # ---------------------------------------------------------------------------
-# IGRAČ
+# PLAYER
 # ---------------------------------------------------------------------------
 
 class Player:
     def __init__(self, gx, gy):
-        self.gx = gx  # Grid pozicija
+        from .rendering import grid_to_world
+
+        self.gx = gx  # Grid position
         self.gy = gy
-        self.wx = 0.0  # World smooth pozicija
-        self.wy = 0.0
-        self.target_gx = gx
-        self.target_gy = gy
+        self.wx, self.wy = grid_to_world(gx, gy)  # World smooth position
+        self.wx = float(self.wx)
+        self.wy = float(self.wy)
+        self.path = [(gx, gy)]  # Path to follow
+        self.path_index = 0  # Current index in path
         self.moving = False
-    
+
     def get_grid_pos(self):
         return self.gx, self.gy
-    
+
     def get_world_pos(self):
         return self.wx, self.wy
-    
-    def set_target(self, tgx, tgy, game_map):
-        """Postavi ciljnu poziciju."""
-        if 0 <= tgx < MAP_W and 0 <= tgy < MAP_H:
-            if WALKABLE.get(game_map[tgy][tgx], False):
-                self.target_gx = tgx
-                self.target_gy = tgy
-                self.moving = True
-    
-    def update(self, game_map, move_speed):
-        """Ažuriraj smooth kretanje igrača."""
-        from .rendering import grid_to_world, screen_to_grid, world_to_screen
-        
-        twx, twy = grid_to_world(self.target_gx, self.target_gy)
-        dx = twx - self.wx
-        dy = twy - self.wy
-        dist = math.sqrt(dx*dx + dy*dy)
-        
-        if dist < move_speed:
-            self.wx = float(twx)
-            self.wy = float(twy)
-            self.gx = self.target_gx
-            self.gy = self.target_gy
-            self.moving = False
+
+    def get_path(self):
+        """Return current path."""
+        return self.path
+
+    def set_path(self, path):
+        """Set new path."""
+        if path and len(path) > 1:
+            self.path = path
+            self.path_index = 0
+            self.moving = True
         else:
+            self.stop()
+
+    def stop(self):
+        """Stop movement."""
+        self.moving = False
+
+    def update(self, game_map, move_speed):
+        """Update smooth movement through path."""
+        from .rendering import grid_to_world, screen_to_grid, world_to_screen
+
+        if not self.moving or self.path_index >= len(self.path):
+            self.moving = False
+            return
+
+        # Next tile in path
+        next_gx, next_gy = self.path[self.path_index]
+        next_wx, next_wy = grid_to_world(next_gx, next_gy)
+
+        dx = next_wx - self.wx
+        dy = next_wy - self.wy
+        dist = math.sqrt(dx*dx + dy*dy)
+
+        if dist < move_speed:
+            # Reached next tile
+            self.wx = float(next_wx)
+            self.wy = float(next_wy)
+            self.gx = next_gx
+            self.gy = next_gy
+            self.path_index += 1
+
+            if self.path_index >= len(self.path):
+                self.moving = False
+        else:
+            # Move towards next tile
             self.wx += dx / dist * move_speed
             self.wy += dy / dist * move_speed
-            # Ažuriraj grid poziciju na osnovu smooth pozicije
             self.gx, self.gy = screen_to_grid(
                 *world_to_screen(self.wx, self.wy, 0, 0), 0, 0
             )
